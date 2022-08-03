@@ -29,19 +29,18 @@ let get_feedback (contr_callback : oracle_param) (store : storage) : return =
   in
   [ op ], store
 
+// @view
+let feedback (_, store : unit * storage) : string = 
+  store.feedback
+
+
 let poke_and_get_feedback (oracle_addr : address) (store : storage) : return = 
-  let call_to_oracle () : oracle_param contract = 
-    match (Tezos.get_entrypoint_opt "%get_feedback" oracle_addr : oracle_param contract option) with
-    | Some contract -> contract
-    | None -> failwith "NO_ORACLE_FOUND"
-  in
-  let op : operation = 
-    Tezos.transaction
-      (Tezos.self "%poke_and_get_feedback_callback" : returned_feedback contract)
-      0mutez
-      (call_to_oracle ())
-  in
-  [ op ], store
+  match (Tezos.call_view "feedback" unit oracle_addr : string option) with
+  | Some feedback  ->
+    let feedback_message = { receiver = oracle_addr; feedback = feedback } in
+    [], { store with poke_traces = Map.add (Tezos.get_source ()) feedback_message store.poke_traces }
+  | None ->
+    failwith "Cannot find view feedback on given oracle address"
 
 let poke_and_get_feedback_callback ((receiver, feedback) : returned_feedback) (store : storage) : return = 
   let feedback_message = { receiver = receiver ; feedback = feedback } in
